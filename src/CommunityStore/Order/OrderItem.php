@@ -2,14 +2,14 @@
 namespace Concrete\Package\CommunityStore\Src\CommunityStore\Order;
 
 use Doctrine\ORM\Mapping as ORM;
-use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
 use Concrete\Core\Support\Facade\Database;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Order\Order as StoreOrder;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Order\OrderItemOption as StoreOrderItemOption;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product as StoreProduct;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption as StoreProductOption;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem as StoreProductOptionItem;
 use Concrete\Core\Support\Facade\Application;
+use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Order\Order;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Order\OrderItemOption;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem;
 
 /**
  * @ORM\Entity
@@ -27,6 +27,11 @@ class OrderItem
      * @ORM\Column(type="integer")
      */
     protected $pID;
+
+    /**
+     * @ORM\Column(type="integer", nullable=true)
+     */
+    protected $pvID;
 
     /**
      * @ORM\ManyToOne(targetEntity="Concrete\Package\CommunityStore\Src\CommunityStore\Order\Order", inversedBy="orderItems")
@@ -181,39 +186,86 @@ class OrderItem
     /**
      * @ORM\return mixed
      */
+    public function getQuantity() {
+        return round($this->oiQty, 4);
+    }
+
+    /**
+     * @deprecated
+     */
     public function getQty()
     {
-        return round($this->oiQty, 4);
+       return $this->getQuantity();
     }
 
     /**
      * @ORM\param mixed $oiQty
      */
-    public function setQty($oiQty)
+    public function setQuantity($oiQty)
     {
         $this->oiQty = $oiQty;
     }
 
     /**
+     * @deprecated
+     */
+    public function setQty($oiQty)
+    {
+        $this->setQuantity($oiQty);
+    }
+
+    /**
      * @ORM\return mixed
      */
-    public function getQtyLabel()
+    public function getQuantityLabel()
     {
         return $this->oiQtyLabel;
     }
 
     /**
+     * @deprecated
+     */
+    public function getQtyLabel()
+    {
+        return $this->getQuantityLabel();
+    }
+
+    /**
      * @ORM\param mixed $oiQtyLabel
+     */
+    public function setQuantityLabel($oiQtyLabel)
+    {
+        $this->oiQtyLabel = $oiQtyLabel;
+    }
+
+    /**
+     * @deprecated
      */
     public function setQtyLabel($oiQtyLabel)
     {
-        $this->oiQtyLabel = $oiQtyLabel;
+        $this->setQuantityLabel($oiQtyLabel);
     }
 
     public function setProductID($productid)
     {
         $this->pID = $productid;
     }
+
+    public function getProductID()
+    {
+        return $this->pID;
+    }
+
+    public function setVariationID($variationID)
+    {
+        $this->pvID = $variationID;
+    }
+
+    public function getVariationID()
+    {
+        return $this->pvID;
+    }
+
 
     /**
      * @ORM\return mixed
@@ -257,21 +309,9 @@ class OrderItem
         $qtyLabel = $csm->t($product->getQtyLabel(), 'productQuantityLabel', $product->getID());
 
         $sku = $product->getSKU();
-
-        $inStock = $product->getQty();
-        $newStock = $inStock - $qty;
-
         $variation = $product->getVariation();
 
-        if ($variation) {
-            if (!$variation->isUnlimited()) {
-                $product->updateProductQty($newStock);
-            }
-        } elseif (!$product->isUnlimited()) {
-            $product->updateProductQty($newStock);
-        }
-
-        $order = StoreOrder::getByID($oID);
+        $order = Order::getByID($oID);
 
         $orderItem = new self();
         $orderItem->setProductName($productName);
@@ -280,20 +320,23 @@ class OrderItem
         $orderItem->setTax($tax);
         $orderItem->setTaxIncluded($taxIncluded);
         $orderItem->setTaxName($taxName);
-        $orderItem->setQty($qty);
-        $orderItem->setQtyLabel($qtyLabel);
+        $orderItem->setQuantity($qty);
+        $orderItem->setQuantityLabel($qtyLabel);
         $orderItem->setOrder($order);
 
-        if ($product) {
-            $orderItem->setProductID($product->getID());
+        $orderItem->setProductID($data['product']['pID']);
+
+        if ($variation) {
+            $orderItem->setVariationID($variation->getID());
         }
+
 
         $orderItem->save();
 
         foreach ($data['productAttributes'] as $groupID => $valID) {
             if ('po' == substr($groupID, 0, 2)) {
                 $groupID = str_replace("po", "", $groupID);
-                $optionvalue = StoreProductOptionItem::getByID($valID);
+                $optionvalue = ProductOptionItem::getByID($valID);
 
                 if ($optionvalue) {
                     $optionvalue = $csm->t($optionvalue->getName(), 'optionValue');
@@ -314,12 +357,12 @@ class OrderItem
 
             $optionGroupName = '';
 
-            $optiongroup = StoreProductOption::getByID($groupID);
+            $optiongroup = ProductOption::getByID($groupID);
             if ($optiongroup) {
                 $optionGroupName = $csm->t($optiongroup->getName(), 'optionName', null, $groupID);
             }
 
-            $orderItemOption = new StoreOrderItemOption();
+            $orderItemOption = new OrderItemOption();
             $orderItemOption->setOrderItemOptionKey($optionGroupName);
             $orderItemOption->setOrderItemOptionValue($optionvalue);
             $orderItemOption->setOrderItem($orderItem);
@@ -329,15 +372,10 @@ class OrderItem
         return $orderItem;
     }
 
-    public function getProductID()
-    {
-        return $this->pID;
-    }
-
     public function getSubTotal()
     {
         $price = $this->getPricePaid();
-        $qty = $this->getQty();
+        $qty = $this->getQuantity();
         $subtotal = $qty * $price;
 
         return $subtotal;
@@ -350,7 +388,7 @@ class OrderItem
 
     public function getProductObject()
     {
-        return StoreProduct::getByID($this->getProductID());
+        return Product::getByID($this->getProductID());
     }
 
     public function save()

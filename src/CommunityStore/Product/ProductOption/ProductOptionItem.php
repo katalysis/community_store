@@ -3,7 +3,7 @@ namespace Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOpti
 
 use Doctrine\ORM\Mapping as ORM;
 use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product as StoreProduct;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product;
 
 /**
  * @ORM\Entity
@@ -49,6 +49,16 @@ class ProductOptionItem
     protected $poiSelectorName;
 
     /**
+     * @ORM\Column(type="decimal", precision=10, scale=2, nullable=true)
+     */
+    protected $pPriceAdjust;
+
+    /**
+     * @ORM\Column(type="decimal", precision=10, scale=2, nullable=true)
+     */
+    protected $pWeightAdjust;
+
+    /**
      * @ORM\Column(type="integer")
      */
     protected $poiSort;
@@ -85,6 +95,37 @@ class ProductOptionItem
         }
 
         return $this->getName();
+    }
+
+    public function getPriceAdjustment($discounts = false)
+    {
+        if ($this->pPriceAdjust && $discounts &&!empty($discounts)) {
+            foreach ($discounts as $discount) {
+                $discount->setApplicableTotal($this->pPriceAdjust);
+                $discountedprice = $discount->returnDiscountedPrice();
+
+                if (false !== $discountedprice) {
+                    return $discountedprice;
+                }
+            }
+        }
+
+        return $this->pPriceAdjust;
+    }
+
+    public function setPriceAdjustment($priceAdjust)
+    {
+        $this->pPriceAdjust = (float)$priceAdjust;
+    }
+
+    public function getWeightAdjustment()
+    {
+        return $this->pWeightAdjust;
+    }
+
+    public function setWeightAdjustment($weightAdjust)
+    {
+        $this->pWeightAdjust = (float)$weightAdjust;
     }
 
     private function setSort($sort)
@@ -141,7 +182,7 @@ class ProductOptionItem
         return $em->getRepository(get_class())->findBy(['poID' => $po->getID()], ['poiSort' => 'asc']);
     }
 
-    public static function removeOptionItemsForProduct(StoreProduct $product, $excluding = [])
+    public static function removeOptionItemsForProduct(Product $product, $excluding = [])
     {
         if (!is_array($excluding)) {
             $excluding = [];
@@ -163,12 +204,14 @@ class ProductOptionItem
         }
     }
 
-    public static function add($option, $name, $sort, $selectorname, $hidden = false, $persistonly = false)
+    public static function add($option, $name, $sort, $selectorname, $priceAdjust, $weightAdjust, $hidden = false, $persistonly = false)
     {
         $productOptionItem = new self();
         $productOptionItem->setOption($option);
         $productOptionItem->setName($name);
         $productOptionItem->setSelectorName($selectorname);
+        $productOptionItem->setPriceAdjustment($priceAdjust);
+        $productOptionItem->setWeightAdjustment($weightAdjust);
         $productOptionItem->setSort($sort);
         $productOptionItem->setHidden($hidden);
         $productOptionItem->save($persistonly);
@@ -176,10 +219,12 @@ class ProductOptionItem
         return $productOptionItem;
     }
 
-    public function update($name, $sort, $selectorname, $hidden = false, $persistonly = false)
+    public function update($name, $sort, $selectorname, $priceAdjust, $weightAdjust, $hidden = false, $persistonly = false)
     {
         $this->setName($name);
         $this->setSelectorName($selectorname);
+        $this->setPriceAdjustment($priceAdjust);
+        $this->setWeightAdjustment($weightAdjust);
         $this->setSort($sort);
         $this->setHidden($hidden);
         $this->save($persistonly);

@@ -12,27 +12,27 @@ use Concrete\Core\Attribute\Key\Category;
 use Concrete\Core\Page\Type\Type as PageType;
 use Concrete\Core\Search\Pagination\PaginationFactory;
 use Concrete\Core\Page\Controller\DashboardSitePageController;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Tax\TaxClass as StoreTaxClass;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product as StoreProduct;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Group\GroupList as StoreGroupList;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductFile as StoreProductFile;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductList as StoreProductList;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductEvent as StoreProductEvent;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductGroup as StoreProductGroup;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductImage as StoreProductImage;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductRelated as StoreProductRelated;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductLocation as StoreProductLocation;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductPriceTier as StoreProductPriceTier;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductUserGroup as StoreProductUserGroup;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption as StoreProductOption;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariation as StoreProductVariation;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Tax\TaxClass;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductFile;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductList;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductEvent;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductGroup;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductImage;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductRelated;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductLocation;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductPriceTier;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductUserGroup;
 use Concrete\Package\CommunityStore\Src\CommunityStore\Manufacturer\ManufacturerList;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Group\GroupList as StoreGroupList;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariation;
 
 class Products extends DashboardSitePageController
 {
     public function view($gID = null)
     {
-        $productsList = new StoreProductList();
+        $productsList = new ProductList();
         $productsList->setItemsPerPage(20);
         $productsList->setGroupID($gID);
         $productsList->setActiveOnly(false);
@@ -85,6 +85,13 @@ class Products extends DashboardSitePageController
 
     public function add()
     {
+        if ($this->request->getMethod() == 'POST') {
+           $return = $this->save();
+           if ($return) {
+               return $return;
+           }
+        }
+
         $this->loadFormAssets();
         $this->set("actionType", t("Add"));
 
@@ -98,7 +105,7 @@ class Products extends DashboardSitePageController
         $gl = new GroupList();
         $gl->setItemsPerPage(1000);
         $gl->filterByAssignable();
-        $usergroups = $gl->get();
+        $usergroups = $gl->getResults();
 
         $usergrouparray = [];
 
@@ -134,11 +141,18 @@ class Products extends DashboardSitePageController
 
     public function edit($pID)
     {
+        if ($this->request->getMethod() == 'POST') {
+            $return = $this->save();
+            if ($return) {
+                return $return;
+            }
+        }
+
         $this->loadFormAssets();
         $this->set("actionType", t("Update"));
 
         //get the product
-        $product = StoreProduct::getByID($pID);
+        $product = Product::getByID($pID);
 
         if (!$product) {
             return Redirect::to('/dashboard/store/products');
@@ -173,7 +187,7 @@ class Products extends DashboardSitePageController
 
         $optionArrays = array_values($optionArrays);
 
-        $comboOptions = StoreProductVariation::combinations($optionArrays);
+        $comboOptions = ProductVariation::combinations($optionArrays);
 
         $checkedOptions = [];
 
@@ -219,7 +233,7 @@ class Products extends DashboardSitePageController
         $gl = new GroupList();
         $gl->setItemsPerPage(1000);
         $gl->filterByAssignable();
-        $usergroups = $gl->get();
+        $usergroups = $gl->getResults();
 
         $usergrouparray = [];
 
@@ -269,14 +283,14 @@ class Products extends DashboardSitePageController
 
     public function generate($pID, $templateID = null)
     {
-        StoreProduct::getByID($pID)->generatePage($templateID);
+        Product::getByID($pID)->generatePage($templateID);
 
         return Redirect::to('/dashboard/store/products/edit', $pID);
     }
 
     public function duplicate($pID)
     {
-        $product = StoreProduct::getByID($pID);
+        $product = Product::getByID($pID);
         if (!$product) {
             return Redirect::to('/dashboard/store/products');
         }
@@ -295,7 +309,7 @@ class Products extends DashboardSitePageController
     public function delete($pID)
     {
         if ($this->token->validate('community_store')) {
-            $product = StoreProduct::getByID($pID);
+            $product = Product::getByID($pID);
             if ($product) {
                 $product->remove();
             }
@@ -338,7 +352,7 @@ class Products extends DashboardSitePageController
         $this->set('pageTemplates', $templates);
         $this->set('defaultTemplateID', $defaultTemplateID);
         $taxClasses = [];
-        foreach (StoreTaxClass::getTaxClasses() as $taxClass) {
+        foreach (TaxClass::getTaxClasses() as $taxClass) {
             $taxClasses[$taxClass->getID()] = $taxClass->getTaxClassName();
         }
         $this->set('taxClasses', $taxClasses);
@@ -347,11 +361,7 @@ class Products extends DashboardSitePageController
     public function save()
     {
         $data = $this->request->request->all();
-        if ($data['pID']) {
-            $this->edit($data['pID']);
-        } else {
-            $this->add();
-        }
+
         if ($this->request->request->all() && $this->token->validate('community_store')) {
             $errors = $this->validate($data);
             $this->error = null; //clear errors
@@ -360,7 +370,7 @@ class Products extends DashboardSitePageController
                 $originalProduct = false;
 
                 if ($data['pID']) {
-                    $product = StoreProduct::getByID($data['pID']);
+                    $product = Product::getByID($data['pID']);
                     $originalProduct = clone $product;
                     $originalProduct->setID($data['pID']);
                 }
@@ -381,7 +391,7 @@ class Products extends DashboardSitePageController
                 }
 
                 //save the product
-                $product = StoreProduct::saveProduct($data);
+                $product = Product::saveProduct($data);
                 //save product attributes
                 $productCategory = $this->app->make('Concrete\Package\CommunityStore\Attribute\Category\ProductCategory');
                 $aks = $productCategory->getList();
@@ -392,40 +402,40 @@ class Products extends DashboardSitePageController
                     $product->setAttribute($uak, $value);
                 }
                 //save images
-                StoreProductImage::addImagesForProduct($data, $product);
+                ProductImage::addImagesForProduct($data, $product);
 
                 //save product groups
-                StoreProductGroup::addGroupsForProduct($data, $product);
+                ProductGroup::addGroupsForProduct($data, $product);
 
                 //save product user groups
-                StoreProductUserGroup::addUserGroupsForProduct($data, $product);
+                ProductUserGroup::addUserGroupsForProduct($data, $product);
 
                 //save product options
-                StoreProductOption::addProductOptions($data, $product);
+                ProductOption::addProductOptions($data, $product);
 
                 //save files
-                StoreProductFile::addFilesForProduct($data, $product);
+                ProductFile::addFilesForProduct($data, $product);
 
                 //save category locations
-                StoreProductLocation::addLocationsForProduct($data, $product);
+                ProductLocation::addLocationsForProduct($data, $product);
 
                 // save variations
-                StoreProductVariation::addVariations($data, $product);
+                ProductVariation::addVariations($data, $product);
 
                 // save related products
-                StoreProductRelated::addRelatedProducts($data, $product);
+                ProductRelated::addRelatedProducts($data, $product);
 
-                StoreProductPriceTier::addPriceTiersForProduct($data, $product);
+                ProductPriceTier::addPriceTiersForProduct($data, $product);
 
                 //$product->reindex();
 
                 // create product event and dispatch
                 if (!$originalProduct) {
-                    $event = new StoreProductEvent($product);
-                    Events::dispatch(StoreProductEvent::PRODUCT_ADD, $event);
+                    $event = new ProductEvent($product);
+                    Events::dispatch(ProductEvent::PRODUCT_ADD, $event);
                 } else {
-                    $event = new StoreProductEvent($originalProduct, $product);
-                    Events::dispatch(StoreProductEvent::PRODUCT_UPDATE, $event);
+                    $event = new ProductEvent($originalProduct, $product);
+                    Events::dispatch(ProductEvent::PRODUCT_UPDATE, $event);
                 }
 
                 if ($data['pID']) {
@@ -433,7 +443,6 @@ class Products extends DashboardSitePageController
                     return Redirect::to('/dashboard/store/products/edit/' . $product->getID());
                 } else {
                     $this->flash('success', t('Product Added'));
-
                     return Redirect::to('/dashboard/store/products/edit/' . $product->getID());
                 }
             }//if no errors
@@ -453,21 +462,7 @@ class Products extends DashboardSitePageController
         if (!is_numeric($args['pQty']) && !$args['pQtyUnlim']) {
             $e->add(t('The Quantity must be set, and numeric'));
         }
-        if (!is_numeric($args['pWidth'])) {
-            $e->add(t('The Product Width must be a number'));
-        }
-        if (!is_numeric($args['pHeight'])) {
-            $e->add(t('The Product Height must be a number'));
-        }
-		if (!is_numeric($args['pStackedHeight'])) {
-			$e->add(t('The Product Stacked Height must be a number'));
-		}
-        if (!is_numeric($args['pLength'])) {
-            $e->add(t('The Product Length must be a number'));
-        }
-        if (!is_numeric($args['pWeight'])) {
-            $e->add(t('The Product Weight must be a number'));
-        }
+
         if (strlen($args['pEan']) > 13) {
             $e->add(t('The EAN can not be greater than 13 Characters'));
         }

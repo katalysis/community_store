@@ -1,15 +1,15 @@
 <?php
 namespace Concrete\Package\CommunityStore\Src\CommunityStore\Utilities;
 
-use Concrete\Core\Controller\Controller;
 use Concrete\Core\User\User;
+use Concrete\Core\Controller\Controller;
 
 class ProductFinder extends Controller
 {
     public function getProductMatch()
     {
         $u = new User();
-        if (!$u->isLoggedIn()) {
+        if (!$u->isRegistered()) {
             echo "Access Denied";
             exit;
         }

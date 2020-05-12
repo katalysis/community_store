@@ -17,7 +17,7 @@ class Customer
 
         if (!is_null($uID)) {
             $this->ui = $app->make(UserInfoRepository::class)->getByID($uID);
-        } elseif ($u->isLoggedIn()) {
+        } elseif ($u->isRegistered()) {
             $this->ui = $app->make(UserInfoRepository::class)->getByID($u->getUserID());
         } else {
             $this->ui = null;
@@ -42,6 +42,10 @@ class Customer
     {
         if ($this->isGuest()) {
             $addressraw = Session::get('community_' . $handle);
+
+            if (is_array($addressraw)) {
+                $addressraw = (object) $addressraw;
+            }
 
             return self::formatAddress($addressraw);
         } else {

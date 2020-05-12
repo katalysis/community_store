@@ -3,10 +3,9 @@ defined('C5_EXECUTE') or die("Access Denied.");
 $app = \Concrete\Core\Support\Facade\Application::getFacadeApplication();
 $dh = $app->make('helper/date');
 
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price as Price;
-use \Concrete\Package\CommunityStore\Entity\Attribute\Key\StoreOrderKey as StoreOrderKey;
 use \Concrete\Core\Support\Facade\Url;
 use \Concrete\Core\User\UserInfoRepository;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price;
 
 ?>
 
@@ -178,7 +177,7 @@ use \Concrete\Core\User\UserInfoRepository;
                             ?>
                         </td>
                         <td class="text-right"><?= Price::format($item->getPricePaid()) ?></td>
-                        <td class="text-right"><?= $item->getQty() ?> <?= h($item->getQtyLabel()); ?></td>
+                        <td class="text-right"><?= $item->getQuantity() ?> <?= h($item->getQuantityLabel()); ?></td>
                         <td class="text-right"><?= Price::format($item->getSubTotal()) ?></td>
                     </tr>
                     <?php
@@ -249,7 +248,7 @@ use \Concrete\Core\User\UserInfoRepository;
                             ?>
                             <?= $discountRuleDeduct; ?>
                         </td>
-                        <td><?= ($discount['odValue'] > 0 ? Price::format($discount['odValue']) : $discount['odPercentage'] . '%'); ?></td>
+                        <td><?= ($discount['odValue'] > 0 ? Price::format($discount['odValue']) : \Punic\Number::formatPercent($discount['odPercentage'] / 100) ); ?></td>
                         <td><?= ($discount['odCode'] ? t('by code') . ' <em>' . $discount['odCode'] . '</em>' : t('Automatically')); ?></td>
                     </tr>
                 <?php } ?>

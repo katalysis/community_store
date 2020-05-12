@@ -2,7 +2,6 @@
 namespace Concrete\Package\CommunityStore\Src\CommunityStore\Utilities;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Multilingual\Translation;
 use Concrete\Core\Localization\Localization;
 use Concrete\Core\Application\Application;
 
@@ -34,10 +33,11 @@ class Multilingual
      * Translate text using Community Store's translation system.
      *
      * @param string $text The text to be translated.
-     * @param string $productID The ID of the product (if applicable).
+     * @param integer $productID The ID of the product (if applicable).
      * @param string $context The type of text being translated.
-     * @param string $id The ID of the entity being translated, for example an attribute's ID.
+     * @param integer $id The ID of the entity being translated, for example an attribute's ID.
      * @param string $forcedLocale Force the translation to a specified locale, instead of determining it automatically.
+     * @param true $useCommon Return a common translation for a string if available
      *
      * @return string Returns the translated text.
      *
@@ -82,7 +82,7 @@ class Multilingual
                 } else {
                     $query->andWhere('t.entityID = :id')->setParameter('id', $id);
                 }
-            } elseif ('productAttributeValue' == $context || 'optionName' == $context || 'optionDetails' == $context || 'optionSelectorName' == $context || 'optionValue' == $context || 'productQuantityLabel' == $context ) {
+            } elseif ('productAttributeValue' == $context || 'optionName' == $context || 'optionDetails' == $context || 'optionSelectorName' == $context || 'optionValue' == $context  ) {
                 $query->andWhere('t.originalText = :text and t.entityID is null')->setParameter('text', $text);
             }
 

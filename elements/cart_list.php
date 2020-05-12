@@ -1,9 +1,9 @@
 <?php
 defined('C5_EXECUTE') or die("Access Denied.");
 
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price as StorePrice;
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption as StoreProductOption;
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem as StoreProductOptionItem;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem;
 
 $app = \Concrete\Core\Support\Facade\Application::getFacadeApplication();
 $csm = $app->make('cs/helper/multilingual');
@@ -18,7 +18,7 @@ if ($cart) {
             <th colspan="2">
                 <?= t('Product'); ?>
             </th>
-            <th>
+            <th class="text-right">
                 <?= t('Price'); ?>
             </th>
             <th class="text-center">
@@ -50,26 +50,26 @@ if ($cart) {
                 <a href="<?= URL::to($productPage) ?>">
                     <?= $thumb ?>
                 </a>
-                <?php 
+                <?php
             } else { ?>
                 <?= $thumb ?>
-                <?php 
+                <?php
             } ?>
             </td>
             <td class="store-cart-product-name">
-                <?php 
+                <?php
             } else { ?>
             <td colspan="2" class="store-cart-product-name">
-                <?php 
+                <?php
             } ?>
                 <?php if ($productPage) { ?>
                 <a href="<?= URL::to($productPage) ?>">
                     <?= $csm->t($product->getName(), 'productName', $product->getID()); ?>
                 </a>
-                <?php 
+                <?php
             } else { ?>
                 <?= $csm->t($product->getName(), 'productName', $product->getID()); ?>
-                <?php 
+                <?php
             } ?>
 
                 <?php if ($cartItem['productAttributes']) { ?>
@@ -78,7 +78,7 @@ if ($cart) {
 
                         if (substr($optionID, 0, 2) == 'po') {
                             $optionID = str_replace("po", "", $optionID);
-                            $optionvalue = StoreProductOptionItem::getByID($valID);
+                            $optionvalue = ProductOptionItem::getByID($valID);
 
                             if ($optionvalue) {
                                 $optionvalue = $optionvalue->getName();
@@ -97,7 +97,7 @@ if ($cart) {
                             $optionvalue = $valID;
                         }
 
-                        $optiongroup = StoreProductOption::getByID($optionID);
+                        $optiongroup = ProductOption::getByID($optionID);
 
                         ?>
                     <?php if ($optionvalue) { ?>
@@ -107,22 +107,22 @@ if ($cart) {
                         <span class="store-cart-list-item-attribute-value">
                             <?= ($optionvalue ? h($csm->t($optionvalue, 'optionValue', $product->getID(), $valID)) : '') ?></span>
                     </div>
-                    <?php 
+                    <?php
                 } ?>
-                    <?php 
+                    <?php
                 } ?>
                 </div>
-                <?php 
+                <?php
             } ?>
             </td>
 
             <td class="store-cart-item-price text-right">
                 <?php if (isset($cartItem['product']['customerPrice'])) { ?>
-                <?= StorePrice::format($cartItem['product']['customerPrice']) ?>
-                <?php 
+                <?= Price::format($cartItem['product']['customerPrice']) ?>
+                <?php
             } else {  ?>
-                <?= StorePrice::format($product->getActivePrice($qty)) ?>
-                <?php 
+                <?= Price::format($product->getActivePrice($qty)) ?>
+                <?php
             } ?>
             </td>
 
@@ -137,7 +137,7 @@ if ($cart) {
                 <?php if ($quantityLabel) { ?>
                 <span class="store-cart-qty-label small">
                     <?= $quantityLabel; ?></span>
-                <?php 
+                <?php
             } ?>
             </td>
 
@@ -151,6 +151,6 @@ if ($cart) {
 ?>
     </tbody>
 </table>
-<?php 
+<?php
 } //if cart
-?> 
+?>

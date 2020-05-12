@@ -1,31 +1,31 @@
 <?php
 namespace Concrete\Package\CommunityStore\Src\CommunityStore\Utilities;
 
-use Concrete\Core\Block\BlockType\BlockType;
-use Concrete\Core\Block\BlockType\Set as BlockTypeSet;
-use Concrete\Core\Page\Single as SinglePage;
-use Concrete\Core\Support\Facade\Application;
 use Concrete\Core\Page\Page;
-use Concrete\Core\Page\Template as PageTemplate;
-use Concrete\Core\Page\Type\Type as PageType;
 use Concrete\Core\User\Group\Group;
 use Concrete\Core\Support\Facade\Config;
-use Concrete\Core\File\Set\Set as FileSet;
-use Concrete\Core\Localization\Localization;
-use Concrete\Core\Attribute\Key\Category as AttributeKeyCategory;
-use Concrete\Core\Attribute\Type as AttributeType;
-use Concrete\Core\Attribute\Set as AttributeSet;
-use Concrete\Core\Page\Type\PublishTarget\Type\AllType as PageTypePublishTargetAllType;
-use Concrete\Core\Page\Type\PublishTarget\Configuration\AllConfiguration as PageTypePublishTargetAllConfiguration;
-use Concrete\Package\CommunityStore\Entity\Attribute\Key\StoreOrderKey;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Payment\Method as StorePaymentMethod;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Method\ShippingMethodType as StoreShippingMethodType;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Order\OrderStatus\OrderStatus as StoreOrderStatus;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Tax\TaxClass as StoreTaxClass;
-use Concrete\Core\Entity\Attribute\Key\UserKey;
 use Concrete\Core\Attribute\Key\Category;
+use Concrete\Core\File\Set\Set as FileSet;
+use Concrete\Core\Page\Single as SinglePage;
+use Concrete\Core\Block\BlockType\BlockType;
+use Concrete\Core\Localization\Localization;
+use Concrete\Core\Support\Facade\Application;
+use Concrete\Core\Page\Type\Type as PageType;
+use Concrete\Core\Entity\Attribute\Key\UserKey;
+use Concrete\Core\Attribute\Set as AttributeSet;
+use Concrete\Core\Page\Template as PageTemplate;
+use Concrete\Core\Attribute\Type as AttributeType;
 use Concrete\Core\Database\DatabaseStructureManager;
 use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
+use Concrete\Core\Block\BlockType\Set as BlockTypeSet;
+use Concrete\Core\Attribute\Key\Category as AttributeKeyCategory;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Tax\TaxClass;
+use Concrete\Package\CommunityStore\Entity\Attribute\Key\StoreOrderKey;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Order\OrderStatus\OrderStatus;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Payment\Method as PaymentMethod;
+use Concrete\Core\Page\Type\PublishTarget\Type\AllType as PageTypePublishTargetAllType;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Method\ShippingMethodType;
+use Concrete\Core\Page\Type\PublishTarget\Configuration\AllConfiguration as PageTypePublishTargetAllConfiguration;
 
 class Installer
 {
@@ -53,40 +53,70 @@ class Installer
         self::installSinglePage('/dashboard/store/multilingual/common', $pkg);
 
         if (!$upgrade) {
-            self::installSinglePage('/cart', $pkg);
-            self::installSinglePage('/checkout', $pkg);
-            self::installSinglePage('/checkout/complete', $pkg);
+            $cartPage = self::installSinglePage('/cart', $pkg);
+            $checkoutPage = self::installSinglePage('/checkout', $pkg);
+            $completePage = self::installSinglePage('/checkout/complete', $pkg);
 
-            $cartPage = Page::getByPath('/cart/');
+            $defaultSlug = self::getDefaultSlug();
+
+            $extraCheckoutPage = Page::getByPath($defaultSlug . '/checkout-1');
+            if ($extraCheckoutPage) {
+                $completePage->move($checkoutPage);
+                $extraCheckoutPage->delete();
+            }
+
             $cartPage->setAttribute('exclude_nav', 1);
             $cartPage->setAttribute('exclude_search_index', 1);
             $cartPage->setAttribute('exclude_page_list', 1);
 
-            $checkoutPage = Page::getByPath('/checkout/');
             $checkoutPage->setAttribute('exclude_nav', 1);
             $checkoutPage->setAttribute('exclude_search_index', 1);
             $checkoutPage->setAttribute('exclude_page_list', 1);
 
-            $completePage = Page::getByPath('/checkout/complete');
             $completePage->setAttribute('exclude_nav', 1);
             $completePage->setAttribute('exclude_search_index', 1);
             $completePage->setAttribute('exclude_page_list', 1);
         }
     }
 
+
+    public static function getDefaultSlug() {
+        $app = \Concrete\Core\Support\Facade\Application::getFacadeApplication();
+        $site = $app->make('site')->getSite();
+        $defaultLocale = $site->getDefaultLocale();
+        $defaultHome = $defaultLocale->getSiteTree()->getSiteHomePageObject();
+        $defaultSlug = '';
+
+        if (is_object($defaultHome)) {
+            $defaultSlug = $defaultHome->getCollectionHandle();
+
+            if ($defaultSlug) {
+                $defaultSlug = '/' . $defaultSlug;
+            }
+        }
+
+        return $defaultSlug;
+    }
+
     public static function installSinglePage($path, $pkg)
     {
         $page = Page::getByPath($path);
         if (!is_object($page) || $page->isError()) {
-            SinglePage::add($path, $pkg);
+            return SinglePage::add($path, $pkg);
         }
     }
 
     public static function installProductParentPage($pkg)
     {
-        $productParentPage = Page::getByPath('/products');
+        $defaultSlug = self::getDefaultSlug();
+        $productParentPage = Page::getByPath($defaultSlug . '/products');
         if (!is_object($productParentPage) || $productParentPage->isError()) {
-            $productParentPage = Page::getByID(1)->add(
+        	if ($defaultSlug === '' || $defaultSlug === '/') {
+        		$parentPage = Page::getByID(1);
+			} else {
+        		$parentPage = Page::getByPath($defaultSlug);
+			}
+            $productParentPage = $parentPage->add(
                 PageType::getByHandle('page'),
                 [
                     'cName' => t('Products'),
@@ -107,7 +137,7 @@ class Installer
             PageType::add(
                 [
                     'handle' => 'store_product',
-                    'name' => 'Product Page',
+                    'name' => t('Product'),
                     'defaultTemplate' => $template,
                     'allowedTemplates' => 'C',
                     'templates' => [$template],
@@ -121,25 +151,20 @@ class Installer
 
     public static function setDefaultConfigValues($pkg)
     {
-        self::setConfigValue('community_store.productPublishTarget', Page::getByPath('/products')->getCollectionID());
-        self::setConfigValue('community_store.symbol', '$');
-        self::setConfigValue('community_store.whole', '.');
-        self::setConfigValue('community_store.thousand', ',');
-        self::setConfigValue('community_store.sizeUnit', 'in');
-        self::setConfigValue('community_store.weightUnit', 'lb');
-        self::setConfigValue('community_store.taxName', t('Tax'));
-        self::setConfigValue('community_store.sizeUnit', 'in');
-        self::setConfigValue('community_store.weightUnit', 'lb');
-        self::setConfigValue('community_store.guestCheckout', 'always');
+        $defaultSlug = self::getDefaultSlug();
+
+        Config::save('community_store.productPublishTarget', Page::getByPath($defaultSlug . '/products')->getCollectionID());
+        Config::save('community_store.symbol', '$');
+        Config::save('community_store.whole', '.');
+        Config::save('community_store.thousand', ',');
+        Config::save('community_store.sizeUnit', 'in');
+        Config::save('community_store.weightUnit', 'lb');
+        Config::save('community_store.taxName', t('Tax'));
+        Config::save('community_store.sizeUnit', 'in');
+        Config::save('community_store.weightUnit', 'lb');
+        Config::save('community_store.guestCheckout', 'always');
     }
 
-    public static function setConfigValue($key, $value)
-    {
-        $config = Config::get($key);
-        if (empty($config)) {
-            Config::save($key, $value);
-        }
-    }
 
     public static function installPaymentMethods($pkg)
     {
@@ -148,9 +173,9 @@ class Installer
 
     public static function installPaymentMethod($handle, $name, $pkg = null, $displayName = null, $enabled = true)
     {
-        $pm = StorePaymentMethod::getByHandle($handle);
+        $pm = PaymentMethod::getByHandle($handle);
         if (!is_object($pm)) {
-            StorePaymentMethod::add($handle, $name, $pkg, $displayName, $enabled);
+            PaymentMethod::add($handle, $name, $pkg, $displayName, $enabled);
         }
     }
 
@@ -162,9 +187,9 @@ class Installer
 
     public static function installShippingMethod($handle, $name, $pkg)
     {
-        $smt = StoreShippingMethodType::getByHandle($handle);
+        $smt = ShippingMethodType::getByHandle($handle);
         if (!is_object($smt)) {
-            StoreShippingMethodType::add($handle, $name, $pkg);
+            ShippingMethodType::add($handle, $name, $pkg);
         }
     }
 
@@ -407,7 +432,7 @@ class Installer
 
     public static function installOrderStatuses($pkg)
     {
-        $table = StoreOrderStatus::getTableName();
+        $table = OrderStatus::getTableName();
         $app = Application::getFacadeApplication();
         $db = $app->make('database')->connection();
         $statuses = [
@@ -422,19 +447,19 @@ class Installer
         $db->query("DELETE FROM " . $table);
 
         foreach ($statuses as $status) {
-            StoreOrderStatus::add($status['osHandle'], $status['osName'], $status['osInformSite'], $status['osInformCustomer'], $status['osIsStartingStatus']);
+            OrderStatus::add($status['osHandle'], $status['osName'], $status['osInformSite'], $status['osInformCustomer'], $status['osIsStartingStatus']);
         }
     }
 
     public static function installDefaultTaxClass($pkg)
     {
-        $defaultTaxClass = StoreTaxClass::getByHandle("default");
+        $defaultTaxClass = TaxClass::getByHandle("default");
         if (!is_object($defaultTaxClass)) {
             $data = [
                 'taxClassName' => t('Default'),
                 'taxClassLocked' => true,
             ];
-            $defaultTaxClass = StoreTaxClass::add($data);
+            $defaultTaxClass = TaxClass::add($data);
         }
     }
 

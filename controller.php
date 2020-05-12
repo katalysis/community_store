@@ -17,8 +17,8 @@ use Concrete\Core\Page\Page;
 class Controller extends Package
 {
     protected $pkgHandle = 'community_store';
-    protected $appVersionRequired = '8.2.1';
-    protected $pkgVersion = '2.1.10';
+    protected $appVersionRequired = '8.4';
+    protected $pkgVersion = '2.2.3';
 
     protected $pkgAutoloaderRegistries = [
         'src/CommunityStore' => '\Concrete\Package\CommunityStore\Src\CommunityStore',
@@ -213,6 +213,10 @@ class Controller extends Package
             var HELPERSURL = '" . rtrim(Url::to('/helpers'), '/') . "';
             var QTYMESSAGE = '" . t('Quantity must be greater than zero') . "';
             var CHECKOUTSCROLLOFFSET = " . Config::get('community_store.checkout_scroll_offset', 0) . ";
+            var CURRENCYCODE = '" . (Config::get('community_store.currency') ? Config::get('community_store.currency') : '') . "';
+            var CURRENCYSYMBOL = '" . Config::get('community_store.symbol')  . "';
+            var CURRENCYDECIMAL = '" . Config::get('community_store.whole')  . "';
+            var CURRENCYGROUP = '" . Config::get('community_store.thousand')   . "';
         </script>
         ";
     }

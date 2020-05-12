@@ -3,32 +3,32 @@ namespace Concrete\Package\CommunityStore\Src\CommunityStore\Product;
 
 use Concrete\Package\CommunityStore\Src\CommunityStore\Manufacturer\Manufacturer;
 use Doctrine\ORM\Mapping as ORM;
-use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
-use Concrete\Core\Package\Package;
 use Concrete\Core\Page\Page;
-use Concrete\Core\Page\Type\Type as PageType;
-use Concrete\Core\Page\Template as PageTemplate;
 use Concrete\Core\File\File;
+use Concrete\Core\Package\Package;
 use Concrete\Core\Support\Facade\Config;
 use Concrete\Core\Support\Facade\Events;
-use Doctrine\Common\Collections\ArrayCollection;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductImage as StoreProductImage;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductGroup as StoreProductGroup;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductUserGroup as StoreProductUserGroup;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductFile as StoreProductFile;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductLocation as StoreProductLocation;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption as StoreProductOption;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem as StoreProductOptionItem;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariation as StoreProductVariation;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductRelated as StoreProductRelated;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductEvent as StoreProductEvent;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Tax\TaxClass as StoreTaxClass;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price as StorePrice;
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Wholesale;
 use Concrete\Core\Support\Facade\Application;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Package as StorePackage;
-use Concrete\Package\CommunityStore\Entity\Attribute\Value\StoreProductValue;
+use Concrete\Core\Page\Type\Type as PageType;
+use Doctrine\Common\Collections\ArrayCollection;
+use Concrete\Core\Page\Template as PageTemplate;
 use Concrete\Core\Multilingual\Page\Section\Section;
+use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Tax\TaxClass;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductFile;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductImage;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductGroup;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductEvent;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Wholesale;
+use Concrete\Package\CommunityStore\Entity\Attribute\Value\StoreProductValue;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductRelated;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductLocation;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductUserGroup;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Package as StorePackage;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariation;
 
 use \Concrete\Core\Attribute\ObjectTrait;
 
@@ -38,6 +38,10 @@ use \Concrete\Core\Attribute\ObjectTrait;
  */
 class Product
 {
+    // not stored, used for price/sku/etc lookup purposes
+    public $priceAdjustment = 0;
+    public $weightAdjustment = 0;
+    public $variation;
 
     use ObjectTrait;
     /**
@@ -263,9 +267,6 @@ class Product
     protected $manufacturer;
 
 
-    // not stored, used for price/sku/etc lookup purposes
-    protected $variation;
-
     /**
      * @ORM\OneToMany(targetEntity="Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductLocation", mappedBy="product",cascade={"persist"}))
      */
@@ -410,12 +411,39 @@ class Product
         $this->priceTiers = new ArrayCollection();
     }
 
+    public function setPriceAdjustment($adjustment){
+        $this->priceAdjustment = $adjustment;
+    }
+
+    public function getPriceAdjustment($discounts = false){
+        if ($this->priceAdjustment && $discounts &&!empty($discounts)) {
+            foreach ($discounts as $discount) {
+                $discount->setApplicableTotal($this->priceAdjustment);
+                $discountedprice = $discount->returnDiscountedPrice();
+
+                if (false !== $discountedprice) {
+                    return $discountedprice;
+                }
+            }
+        }
+
+        return $this->priceAdjustment;
+    }
+
+    public function setWeightAdjustment($adjustment){
+        $this->weightAdjustment = $adjustment;
+    }
+
+    public function getWeightAdjustment(){
+        return $this->weightAdjustment;
+    }
+
     public function setVariation($variation)
     {
         if (is_object($variation)) {
             $this->variation = $variation;
         } elseif (is_integer($variation)) {
-            $variation = StoreProductVariation::getByID($variation);
+            $variation = ProductVariation::getByID($variation);
 
             if ($variation) {
                 $this->variation = $variation;
@@ -448,7 +476,7 @@ class Product
                 }
             }
 
-            $this->setVariation(StoreProductVariation::getByOptionItemIDs($optionkeys));
+            $this->setVariation(ProductVariation::getByOptionItemIDs($optionkeys));
         }
     }
 
@@ -506,15 +534,15 @@ class Product
 
     public function setPrice($price)
     {
-        $this->pPrice = ('' != $price ? $price : 0);
+        $this->pPrice = ('' != $price ? (float)$price : 0);
     }
     public function setWholesalePrice($price)
     {
-        $this->pWholesalePrice = ($price != '' ? $price : 0);
+        $this->pWholesalePrice = ($price != '' ? (float)$price : null);
     }
     public function setSalePrice($price)
     {
-        $this->pSalePrice = ('' != $price ? $price : null);
+        $this->pSalePrice = ('' != $price ? (float)$price : null);
     }
 
     public function setCustomerPrice($bool)
@@ -779,17 +807,25 @@ class Product
         $this->manufacturer = $manufacturer;
     }
 
-    public function updateProductQty($qty)
+
+    public function setStockLevel($qty)
     {
         if ($this->hasVariations() && $variation = $this->getVariation()) {
             if ($variation) {
-                $variation->setVariationQty($qty);
+                $variation->setStockLevel($qty);
                 $variation->save();
             }
         } else {
             $this->setQty($qty);
             $this->save();
         }
+    }
+
+    /**
+     * @deprecated
+     */
+    public function updateProductQty($qty) {
+        $this->setStockLevel($qty);
     }
 
 	/**
@@ -815,12 +851,30 @@ class Product
 	/**
 	 * @return \Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product
 	 */
-    public static function getByCollectionID($cID)
+    public static function getByCollectionID($cID, $allLocales = true)
     {
         $em = dbORM::entityManager();
 
-        return $em->getRepository(get_class())->findOneBy(['cID' => $cID]);
+        $product =  $em->getRepository(get_class())->findOneBy(['cID' => $cID]);
+
+        // if product not found, look for it via multilingual related page
+        if ($allLocales && !$product) {
+            $app = \Concrete\Core\Support\Facade\Application::getFacadeApplication();
+            $site = $app->make('site')->getSite();
+            if ($site) {
+                $locale = $site->getDefaultLocale();
+
+                if ($locale) {
+                    $originalcID = Section::getRelatedCollectionIDForLocale($cID, $locale->getLocale());
+                    $product = Product::getByCollectionID($originalcID, false);
+                }
+            }
+        }
+
+        return $product;
+
     }
+
 
     public function getAttributes()
     {
@@ -848,8 +902,19 @@ class Product
         $product->setDescription($data['pDesc']);
         $product->setDetail($data['pDetail']);
         $product->setPrice($data['pPrice']);
-        $product->setWholesalePrice($data['pWholesalePrice']);
-        $product->setSalePrice($data['pSalePrice']);
+
+        if ($data['pWholesalePrice'] > 0) {
+            $product->setWholesalePrice($data['pWholesalePrice']);
+        } else {
+            $product->setWholesalePrice( null);
+        }
+
+        if ($data['pSalePrice'] > 0) {
+            $product->setSalePrice($data['pSalePrice']);
+        } else {
+            $product->setSalePrice('');
+        }
+
         $product->setIsFeatured($data['pFeatured']);
         $product->setQty($data['pQty']);
         $product->setIsUnlimited($data['pQtyUnlim']);
@@ -1012,6 +1077,8 @@ class Product
             $price = $this->getQuantityAdjustedPrice($qty);
         }
 
+        $price += $this->getPriceAdjustment();
+
         $discounts = $this->getDiscountRules();
 
         if (!$ignoreDiscounts) {
@@ -1030,18 +1097,37 @@ class Product
         return $price;
     }
 
+    public function getWholesalePriceValue() {
+        return $this->pWholesalePrice;
+    }
+
     public function getWholesalePrice($qty = 1)
     {
+        $price = $this->pPrice;
+
         if ($this->hasVariations() && $variation = $this->getVariation()) {
             if ($variation) {
                 $varWholesalePrice = $variation->getVariationWholesalePrice();
 
                 if ($varWholesalePrice) {
-                    return $varWholesalePrice;
+                    $price = $varWholesalePrice;
                 }
             }
+        } else {
+            $price = $this->pWholesalePrice;
+
+            if (!$price) {
+                $price = $this->pPrice;
+            }
         }
-        return $this->pWholesalePrice;
+
+        $priceAdjustment = $this->getPriceAdjustment();
+
+        if ($price && $priceAdjustment != 0) {
+            return $price + $priceAdjustment;
+        }
+
+        return $price;
     }
 
     private function getQuantityAdjustedPrice($qty = 1) {
@@ -1066,17 +1152,17 @@ class Product
 
     public function getFormattedOriginalPrice()
     {
-        return StorePrice::format($this->getPrice(1));
+        return Price::format($this->getPrice(1));
     }
 
     public function getFormattedPrice()
     {
-        return StorePrice::format($this->getActivePrice());
+        return Price::format($this->getActivePrice());
     }
 
     public function getFormattedWholesalePrice()
     {
-        return StorePrice::format($this->getWholesalePrice());
+        return Price::format($this->getWholesalePrice());
     }
 
     public function getSalePrice()
@@ -1085,14 +1171,21 @@ class Product
             if ($variation) {
                 $varprice = $variation->getVariationSalePrice();
                 if ($varprice) {
-                    return $varprice;
+                    $price = $varprice;
                 } else {
-                    return $this->pSalePrice;
+                    $price = $this->pSalePrice;
                 }
             }
         } else {
-            return $this->pSalePrice;
+            $price = $this->pSalePrice;
         }
+
+        $priceAdjustment = $this->getPriceAdjustment();
+
+        if ($price && $priceAdjustment != 0) {
+            return $price + $priceAdjustment;
+        }
+        return $price;
     }
 
     public function getFormattedSalePrice()
@@ -1100,7 +1193,7 @@ class Product
         $saleprice = $this->getSalePrice();
 
         if ('' != $saleprice) {
-            return StorePrice::format($saleprice);
+            return Price::format($saleprice);
         }
     }
 
@@ -1119,7 +1212,7 @@ class Product
 
     public function getFormattedActivePrice($qty = 1)
     {
-        return StorePrice::format($this->getActivePrice($qty));
+        return Price::format($this->getActivePrice($qty));
     }
 
     public function getTaxClassID()
@@ -1129,7 +1222,7 @@ class Product
 
     public function getTaxClass()
     {
-        return StoreTaxClass::getByID($this->pTaxClass);
+        return TaxClass::getByID($this->pTaxClass);
     }
 
     public function isTaxable()
@@ -1279,10 +1372,11 @@ class Product
         if ($this->hasVariations() && $variation = $this->getVariation()) {
             $varWeight = $variation->getVariationWeight();
             if ($varWeight) {
-                return $varWeight;
+                $weight = $varWeight;
             }
         }
 
+        $weight += $this->getWeightAdjustment();
         return $weight;
     }
 
@@ -1383,12 +1477,12 @@ class Product
 
     public function getDownloadFiles()
     {
-        return StoreProductFile::getFilesForProduct($this);
+        return ProductFile::getFilesForProduct($this);
     }
 
     public function getDownloadFileObjects()
     {
-        return StoreProductFile::getFileObjectsForProduct($this);
+        return ProductFile::getFileObjectsForProduct($this);
     }
 
     public function createsLogin()
@@ -1437,7 +1531,7 @@ class Product
 
     public function getUserGroupIDs()
     {
-        return StoreProductUserGroup::getUserGroupIDsForProduct($this);
+        return ProductUserGroup::getUserGroupIDsForProduct($this);
     }
 
     public function getImage()
@@ -1456,13 +1550,20 @@ class Product
         }
     }
 
-    public function getQty()
-    {
+    public function getStockLevel() {
         if ($this->hasVariations() && $variation = $this->getVariation()) {
             return $variation->getVariationQty();
         } else {
             return $this->pQty;
         }
+    }
+
+    /**
+     * @deprecated
+     */
+    public function getQty()
+    {
+        return $this->getStockLevel();
     }
 
     public function getMaxCartQty()
@@ -1509,22 +1610,22 @@ class Product
 
     public function getimagesobjects()
     {
-        return StoreProductImage::getImageObjectsForProduct($this);
+        return ProductImage::getImageObjectsForProduct($this);
     }
 
     public function getLocationPages()
     {
-        return StoreProductLocation::getLocationsForProduct($this);
+        return ProductLocation::getLocationsForProduct($this);
     }
 
     public function getGroupIDs()
     {
-        return StoreProductGroup::getGroupIDsForProduct($this);
+        return ProductGroup::getGroupIDsForProduct($this);
     }
 
     public function getVariations()
     {
-        return StoreProductVariation::getVariationsForProduct($this);
+        return ProductVariation::getVariationsForProduct($this);
     }
 
     public function getDateAdded()
@@ -1549,17 +1650,17 @@ class Product
     public function remove()
     {
         // create product event and dispatch
-        $event = new StoreProductEvent($this);
-        Events::dispatch(StoreProductEvent::PRODUCT_DELETE, $event);
+        $event = new ProductEvent($this);
+        Events::dispatch(ProductEvent::PRODUCT_DELETE, $event);
 
-        StoreProductImage::removeImagesForProduct($this);
-        StoreProductOption::removeOptionsForProduct($this);
-        StoreProductOptionItem::removeOptionItemsForProduct($this);
-        StoreProductFile::removeFilesForProduct($this);
-        StoreProductGroup::removeGroupsForProduct($this);
-        StoreProductLocation::removeLocationsForProduct($this);
-        StoreProductUserGroup::removeUserGroupsForProduct($this);
-        StoreProductVariation::removeVariationsForProduct($this);
+        ProductImage::removeImagesForProduct($this);
+        ProductOption::removeOptionsForProduct($this);
+        ProductOptionItem::removeOptionItemsForProduct($this);
+        ProductFile::removeFilesForProduct($this);
+        ProductGroup::removeGroupsForProduct($this);
+        ProductLocation::removeLocationsForProduct($this);
+        ProductUserGroup::removeUserGroupsForProduct($this);
+        ProductVariation::removeVariationsForProduct($this);
 
         $em = dbORM::entityManager();
         $attributes = $this->getAttributes();
@@ -1718,15 +1819,15 @@ class Product
             foreach ($relatedProducts as $relatedProduct) {
                 $related[] = $relatedProduct->getRelatedProductID();
             }
-            StoreProductRelated::addRelatedProducts(['pRelatedProducts' => $related], $newproduct);
+            ProductRelated::addRelatedProducts(['pRelatedProducts' => $related], $newproduct);
         }
 
         $em = dbORM::entityManager();
         $em->flush();
 
         // create product event and dispatch
-        $event = new StoreProductEvent($this, $newproduct);
-        Events::dispatch(StoreProductEvent::PRODUCT_DUPLICATE, $event);
+        $event = new ProductEvent($this, $newproduct);
+        Events::dispatch(ProductEvent::PRODUCT_DUPLICATE, $event);
 
         return $newproduct;
     }
@@ -1885,10 +1986,15 @@ class Product
     public function getVariationData()
     {
         $firstAvailableVariation = false;
+        $adjustment = 0;
+        $availableOptionsids = [];
+        $foundOptionids = [];
 
         if ($this->hasVariations()) {
-            $availableOptionsids = false;
+            $availableOptionsids = [];
             foreach ($this->getVariations() as $variation) {
+                $foundOptionids = [];
+                $adjustment = 0;
                 $isAvailable = false;
 
                 if ($variation->isSellable()) {
@@ -1896,15 +2002,20 @@ class Product
 
                     foreach ($variationOptions as $variationOption) {
                         $opt = $variationOption->getOptionItem();
+
+                        $foundOptionids[] = $variationOption->getOptionItem()->getOption()->getID() ;
+
                         if ($opt->isHidden()) {
                             $isAvailable = false;
                             break;
                         } else {
                             $isAvailable = true;
+                            $adjustment += $opt->getPriceAdjustment();
                         }
                     }
                     if ($isAvailable) {
                         $availableOptionsids = $variation->getOptionItemIDs();
+
                         $this->shallowClone = true;
                         $firstAvailableVariation = clone $this;
                         $firstAvailableVariation->setVariation($variation);
@@ -1915,7 +2026,20 @@ class Product
             }
         }
 
-        return ['firstAvailableVariation' => $firstAvailableVariation, 'availableOptionsids' => $availableOptionsids];
+        foreach($this->getOptions() as $option) {
+            if (!in_array($option->getID(), $foundOptionids)) {
+                $optionItems = $option->getOptionItems();
+
+                foreach ($optionItems as $optionItem) {
+                    if (!$optionItem->isHidden()) {
+                        $adjustment += $optionItem->getPriceAdjustment();
+                        break;
+                    }
+                }
+            }
+        }
+
+        return ['firstAvailableVariation' => $firstAvailableVariation, 'availableOptionsids' => $availableOptionsids, 'priceAdjustment'=>$adjustment];
     }
 
     // helper function for working with variation options
@@ -1924,7 +2048,7 @@ class Product
         $variationLookup = [];
 
         if ($this->hasVariations()) {
-            $variations = StoreProductVariation::getVariationsForProduct($this);
+            $variations = ProductVariation::getVariationsForProduct($this);
 
             $variationLookup = [];
 

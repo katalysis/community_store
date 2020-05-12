@@ -1,9 +1,10 @@
 <?php
 defined('C5_EXECUTE') or die("Access Denied.");
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price as StorePrice;
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption as StoreProductOption;
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem as StoreProductOptionItem;
+
 use \Concrete\Core\Support\Facade\Url;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOption;
+use \Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem;
 
 $app = \Concrete\Core\Support\Facade\Application::getFacadeApplication();
 $csm = $app->make('cs/helper/multilingual');
@@ -34,8 +35,17 @@ $csm = $app->make('cs/helper/multilingual');
                 <p class="alert alert-warning"><?= t('Due to stock levels your quantity has been limited');?></p>
             <?php } ?>
 
-            <?php if($actiondata['error']) { ?>
-                <p class="alert alert-warning"><?= t('An issue has occured adding the product to the cart. You may be missing required information.');?></p>
+            <?php if($actiondata['error']) {
+				?>
+                <p class="alert alert-warning">
+                    <?php
+                if ($actiondata['errorMsg']){
+                    echo $actiondata['errorMsg'];
+                } else {
+                    echo t('An issue has occured adding the product to the cart. You may be missing required information.');
+                }
+                ?>
+                </p>
             <?php } ?>
         <?php } ?>
 
@@ -60,7 +70,6 @@ $csm = $app->make('cs/helper/multilingual');
                 $i=1;
                 $allowUpdate = false;
                 foreach ($cart as $k=>$cartItem){
-
 
                     $qty = $cartItem['product']['qty'];
                     $product = $cartItem['product']['object'];
@@ -104,7 +113,7 @@ $csm = $app->make('cs/helper/multilingual');
 
                                             if (substr($optionID, 0, 2) == 'po') {
                                                 $optionID = str_replace("po", "", $optionID);
-                                                $optionvalue = StoreProductOptionItem::getByID($valID);
+                                                $optionvalue = ProductOptionItem::getByID($valID);
 
                                                 if ($optionvalue) {
                                                     $optionvalue = $optionvalue->getName();
@@ -123,7 +132,7 @@ $csm = $app->make('cs/helper/multilingual');
                                                 $optionvalue = $valID;
                                             }
 
-                                            $optiongroup = StoreProductOption::getByID($optionID);
+                                            $optiongroup = ProductOption::getByID($optionID);
 
                                             ?>
                                             <?php if ($optiongroup) { ?>
@@ -139,9 +148,9 @@ $csm = $app->make('cs/helper/multilingual');
 
                             <td class="store-cart-list-item-price col-xs-2 text-right">
                                 <?php if (isset($cartItem['product']['customerPrice'])) { ?>
-                                    <?=StorePrice::format($cartItem['product']['customerPrice'])?>
+                                    <?=Price::format($cartItem['product']['customerPrice'])?>
                                 <?php } else {  ?>
-                                    <?=StorePrice::format($product->getActivePrice($qty))?>
+                                    <?=Price::format($product->getActivePrice($qty))?>
                                 <?php } ?>
                             </td>
 
@@ -220,7 +229,7 @@ $csm = $app->make('cs/helper/multilingual');
 
         <p class="store-cart-page-cart-total text-right">
             <strong class="store-cart-grand-total-label"><?= t("Total")?>:</strong>
-            <span class="store-cart-grand-total-value"><?=StorePrice::format($total)?></span>
+            <span class="store-cart-grand-total-value"><?=Price::format($total)?></span>
         </p>
         <?php } else { ?>
         <p class="alert alert-info"><?= t('Your cart is empty'); ?></p>

@@ -1,15 +1,15 @@
 <?php
 namespace Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation;
 
-use Doctrine\ORM\Mapping as ORM;
-use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product as StoreProduct;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariationOptionItem as StoreProductVariationOptionItem;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem as StoreProductOptionItem;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price as StorePrice;
-use Doctrine\Common\Collections\ArrayCollection;
 use Concrete\Core\File\File;
+use Doctrine\ORM\Mapping as ORM;
 use Concrete\Core\Support\Facade\Application;
+use Doctrine\Common\Collections\ArrayCollection;
+use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Utilities\Price;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\Product;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductOption\ProductOptionItem;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariationOptionItem;
 
 /**
  * @ORM\Entity
@@ -107,6 +107,7 @@ class ProductVariation
      * @ORM\OneToMany(targetEntity="Concrete\Package\CommunityStore\Src\CommunityStore\Product\ProductVariation\ProductVariationOptionItem", mappedBy="variation", cascade={"persist"}))
      */
     protected $options;
+
 
     /**
      * @ORM\return mixed
@@ -237,7 +238,7 @@ class ProductVariation
 
     public function getFormattedVariationPrice()
     {
-        return StorePrice::format($this->pvPrice);
+        return Price::format($this->pvPrice);
     }
 
     /**
@@ -274,7 +275,7 @@ class ProductVariation
 
     public function getFormattedVariationSalePrice()
     {
-        return StorePrice::format($this->pvSalePrice);
+        return Price::format($this->pvSalePrice);
     }
 
     /**
@@ -292,17 +293,32 @@ class ProductVariation
     /**
      * @ORM\return mixed
      */
-    public function getVariationQty()
+    public function getStockLevel()
     {
         return $this->pvQty;
     }
 
     /**
+     * @deprecated
+     */
+    public function getVariationQty()
+    {
+        return $this->getStockLevel();
+    }
+
+    /**
      * @ORM\param mixed $pvQty
      */
-    public function setVariationQty($pvQty)
+    public function setVariationStockLevel($pvQty)
     {
         $this->pvQty = $pvQty ? $pvQty : 0;
+    }
+
+    /**
+     * @deprecated
+     */
+    public function setVariationQty($pvQty) {
+        $this->setVariationStockLevel($pvQty);
     }
 
     /**
@@ -461,7 +477,7 @@ class ProductVariation
         }
     }
 
-    public static function addVariations(array $data, StoreProduct $product)
+    public static function addVariations(array $data, Product $product)
     {
         $options = $product->getOptions();
 
@@ -470,8 +486,16 @@ class ProductVariation
         if (!empty($options)) {
             foreach ($options as $option) {
                 if ($option->getIncludeVariations()) {
-                    foreach ($option->getOptionItems() as $optItem) {
+
+                    $optionItems = $option->getOptionItems();
+                    $sortedItems = [];
+                    foreach($optionItems as $optionItem) {
+                        $sortedItems[$optionItem->getSort()] = $optionItem;
+                    }
+
+                    foreach ($sortedItems as $optItem) {
                         $optionArrays[$option->getID()][] = $optItem->getID();
+                        $tempoptionArrays[] = ['id'=>$optItem->getID(), 'order'=>$optItem->getSort()];
                     }
                 }
             }
@@ -515,10 +539,10 @@ class ProductVariation
                     );
 
                     foreach ($optioncombo as $optionvalue) {
-                        $option = StoreProductOptionItem::getByID($optionvalue);
+                        $option = ProductOptionItem::getByID($optionvalue);
 
                         if ($option) {
-                            $variationoption = new StoreProductVariationOptionItem();
+                            $variationoption = new ProductVariationOptionItem();
                             $variationoption->setOptionItem($option);
                             $variationoption->setVariation($variation);
                             $variationoption->save(true);
@@ -532,7 +556,7 @@ class ProductVariation
                     $variation->setVariationPrice($data['pvPrice'][$key]);
                     $variation->setVariationWholesalePrice($data['pvWholesalePrice'][$key]);
                     $variation->setVariationSalePrice($data['pvSalePrice'][$key]);
-                    $variation->setVariationQty($data['pvQty'][$key]);
+                    $variation->setVariationStockLevel($data['pvQty'][$key]);
                     $variation->setVariationQtyUnlim($data['pvQtyUnlim'][$key]);
                     $variation->setVariationFID($data['pvfID'][$key] ? $data['pvfID'][$key] : null);
                     $variation->setVariationWeight($data['pvWeight'][$key]);
@@ -604,7 +628,7 @@ class ProductVariation
         $variation->setVariationPrice($data['pvPrice']);
         $variation->setVariationWholesalePrice($data['pvWholesalePrice']);
         $variation->setVariationSalePrice($data['pvSalePrice']);
-        $variation->setVariationQty($data['pvQty']);
+        $variation->setVariationStockLevel($data['pvQty']);
         $variation->setVariationQtyUnlim($data['pvQtyUnlim']);
         $variation->setVariationFID($data['pvfID']);
         $variation->setVariationWeight($data['pvWidth']);
@@ -646,7 +670,7 @@ class ProductVariation
         }
     }
 
-    public static function getVariationsForProduct(StoreProduct $product)
+    public static function getVariationsForProduct(Product $product)
     {
         $em = dbORM::entityManager();
 
@@ -660,7 +684,7 @@ class ProductVariation
         $em->flush();
     }
 
-    public static function removeVariationsForProduct(StoreProduct $product, $excluding = [])
+    public static function removeVariationsForProduct(Product $product, $excluding = [])
     {
         if (!is_array($excluding)) {
             $excluding = [];

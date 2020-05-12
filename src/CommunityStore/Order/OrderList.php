@@ -7,8 +7,9 @@ use Concrete\Core\Support\Facade\Application;
 use Concrete\Core\Search\Pagination\Pagination;
 use Concrete\Core\Search\ItemList\Database\AttributedItemList;
 use Concrete\Core\Search\Pagination\PaginationProviderInterface;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Order\Order as StoreOrder;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Order\OrderItem as StoreOrderItem;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Order\Order;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Order\OrderItem;
+use Concrete\Package\CommunityStore\Entity\Attribute\Key\StoreOrderKey;
 
 class OrderList extends AttributedItemList implements PaginationProviderInterface
 {
@@ -137,6 +138,7 @@ class OrderList extends AttributedItemList implements PaginationProviderInterfac
         }
 
         if (isset($this->externalPaymentRequested) && $this->externalPaymentRequested) {
+
         } else {
             $this->query->andWhere('o.externalPaymentRequested is null');
         }
@@ -223,7 +225,7 @@ class OrderList extends AttributedItemList implements PaginationProviderInterfac
 
     public function getResult($queryRow)
     {
-        return StoreOrder::getByID($queryRow['oID']);
+        return Order::getByID($queryRow['oID']);
     }
 
     public function setCustomerID($cID)
@@ -276,7 +278,7 @@ class OrderList extends AttributedItemList implements PaginationProviderInterfac
             $oID = $order->getOrderID();
             $OrderOrderItems = $db->GetAll("SELECT * FROM CommunityStoreOrderItems WHERE oID=?", $oID);
             foreach ($OrderOrderItems as $oi) {
-                $oi = StoreOrderItem::getByID($oi['oiID']);
+                $oi = OrderItem::getByID($oi['oiID']);
                 $orderItems[] = $oi;
             }
         }

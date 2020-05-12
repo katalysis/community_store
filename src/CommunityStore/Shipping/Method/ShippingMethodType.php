@@ -1,12 +1,12 @@
 <?php
 namespace Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Method;
 
-use Doctrine\ORM\Mapping as ORM;
-use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
-use Concrete\Core\Support\Facade\Application;
-use Concrete\Core\Package\Package;
 use Concrete\Core\View\View;
-use Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Method\ShippingMethod as StoreShippingMethod;
+use Doctrine\ORM\Mapping as ORM;
+use Concrete\Core\Package\Package;
+use Concrete\Core\Support\Facade\Application;
+use Concrete\Core\Support\Facade\DatabaseORM as dbORM;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Shipping\Method\ShippingMethod as ShippingMethod;
 
 /**
  * @ORM\Entity
@@ -59,14 +59,15 @@ class ShippingMethodType
 
     public function setMethodTypeController()
     {
-        $package = Package::getByID($this->pkgID);
+        $app = Application::getFacadeApplication();
+        $pkg = $app->make('Concrete\Core\Package\PackageService')->getByID($this->pkgID);
 
-        if (!$package) {
+        if (!$pkg) {
             return false;
         }
 
-        $th = Application::getFacadeApplication()->make("helper/text");
-        $namespace = "Concrete\\Package\\" . $th->camelcase($package->getPackageHandle()) . "\\Src\\CommunityStore\\Shipping\\Method\\Types";
+        $th = $app->make("helper/text");
+        $namespace = "Concrete\\Package\\" . $th->camelcase($pkg->getPackageHandle()) . "\\Src\\CommunityStore\\Shipping\\Method\\Types";
 
         $className = $th->camelcase($this->smtHandle) . "ShippingMethod";
         $obj = $namespace . '\\' . $className;
@@ -151,7 +152,7 @@ class ShippingMethodType
 
     public function delete()
     {
-        $methods = StoreShippingMethod::getAvailableMethods($this->getShippingMethodTypeID());
+        $methods = ShippingMethod::getAvailableMethods($this->getShippingMethodTypeID());
         foreach ($methods as $method) {
             $method->delete();
         }
@@ -179,14 +180,14 @@ class ShippingMethodType
     {
         $controller = $this->getMethodTypeController();
         $controller->dashboardForm($sm);
-        $pkg = Package::getByID($this->pkgID);
+        $app = Application::getFacadeApplication();
+        $pkg = $app->make('Concrete\Core\Package\PackageService')->getByID($this->pkgID);
         View::element('shipping_method_types/' . $this->smtHandle . '/dashboard_form', ['vars' => $controller->getSets()], $pkg->getPackageHandle());
     }
 
     public function addMethod($data)
     {
         $sm = $this->getMethodTypeController()->addMethodTypeMethod($data);
-
         return $sm;
     }
 }
